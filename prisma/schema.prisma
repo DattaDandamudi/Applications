@@ -1,0 +1,128 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  resumes     Resume[]
+  jobs        Job[]
+  interviews  Interview[]
+
+  @@map("users")
+}
+
+model Resume {
+  id          String   @id @default(cuid())
+  title       String
+  content     Json     // Stores parsed resume sections
+  originalUrl String?  // URL to original file
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobResumes JobResume[]
+  auditLogs  AuditLog[]
+
+  @@map("resumes")
+}
+
+model Job {
+  id          String   @id @default(cuid())
+  title       String
+  company     String
+  description String
+  location    String?
+  salary      String?
+  stage       String   @default("opportunities")
+  priority    String   @default("medium")
+  appliedDate DateTime?
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobResumes JobResume[]
+  interviews Interview[]
+  documents  JobDocument[]
+
+  @@map("jobs")
+}
+
+model JobResume {
+  id               String   @id @default(cuid())
+  jobId            String
+  resumeId         String
+  optimizedContent Json?    // Stores AI-optimized content
+  matchScore       Float?   // JD match percentage
+  projectCards     Json?    // Individual project optimizations
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  job    Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, resumeId])
+  @@map("job_resumes")
+}
+
+model Interview {
+  id          String    @id @default(cuid())
+  jobId       String
+  userId      String
+  type        String    // phone, video, onsite
+  scheduledAt DateTime
+  status      String    @default("scheduled")
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("interviews")
+}
+
+model JobDocument {
+  id        String   @id @default(cuid())
+  jobId     String
+  type      String   // cover_letter, portfolio, etc
+  title     String
+  content   String?
+  url       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@map("job_documents")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  resumeId   String
+  action     String   // AI_OPTIMIZATION, MANUAL_EDIT, REVERT
+  section    String   // Which section was modified
+  original   String?  // Original content
+  modified   String?  // Modified content
+  metadata   Json?    // Additional context
+  createdAt  DateTime @default(now())
+
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@map("audit_logs")
+}
